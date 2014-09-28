@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>ARDrone Video Test</head>
+
+<body>
+
+<video id="video" width="640" height="360" hidden></video>
+<canvas id="canvas" width="640" height="360"></canvas>
+
+<script src="js/requestAnimFrame.js"></script>
+<script src="js/requestInterval.js"></script>
+
+<script>
+window.onload = function() {
+  var video = document.getElementById('video');
+  var canvas = document.getElementById('canvas');
+  var ctx    = canvas.getContext('2d');
+
+  function updateCanvas() {
+    if (!video.paused && !video.ended) {
+      ctx.drawImage(videoNormal, 0, 0);
+    }
+  }
+
+  var canvasTimer = null;
+  video.addEventListener('play', function () {
+    canvasTimer = window.requestInterval(updateCanvas, 1000 / 15); // 15fps
+  }, 0);
+
+  xwalk.experimental.ardrone.video.addEventListener('newvideoready', function (e) {
+    var cacheDir = typeof xwalk === 'object' ?
+                   xwalk.experimental.native_file_system.getRealPath('CACHEDIR') : null;
+    video.src = 'file://' + cacheDir + '/' + e.videoFile;
+    video.play();
+  }, 0);
+
+  xwalk.experimental.ardrone.video.play();
+}
+</script>
+
+</body>
+</html>
