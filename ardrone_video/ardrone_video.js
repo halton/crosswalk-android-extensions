@@ -31,15 +31,13 @@ function ARDroneVideoOption (){
   this.channel = ARDroneVideoChannel.ZAP_CHANNEL_HORI;
 };
 
-_defineReadOnlyProperty(exports, 'isPlaying', false);
-Object.defineProperty(exports, 'option', null);
+exports.isPlaying = false;
 
 exports.play = function(option) {
   if (exports.isPlaying) {
     console.log('Video is playing, please stop first.');
     return;
   }
-
   if (_isARDroneVideoOption(option)) {
     exports.option = option;
   } else if (!_isARDroneVideoOption(exports.option)) {
@@ -66,8 +64,21 @@ exports.stop = function() {
   return _createPromise(msg);
 };
 
+window.ARDroneVideoEvent = function(data) {
+  _addConstProperty(this, 'videoFile', _createConstClone(data));
+  this.prototype = new Event('ARDroneVideoEvent');
+};
+
 extension.setMessageListener(function(json) {
   var msg = JSON.parse(json);
+
+  // Handle events
+  if (msg.reply == 'newvideofile') {
+    for (var id in g_listeners) {
+      var event = new ARDroneVideoEvent(msg.data);
+      g_listeners[id](event);
+    }
+  }
 
   // Handle promises
   if (msg.data.error) {
@@ -80,9 +91,12 @@ extension.setMessageListener(function(json) {
   delete g_async_calls[msg.asyncCallId];
 });
 
-window.ARDroneVideoEvent = function(data) {
-  _addConstProperty(this, ', _createConstClone(data));
-  this.prototype = new Event('ARDroneVideoEvent');
+exports.addEventListener = function(eventName, callback) {
+  if (eventName != 'newvideoready') {
+    console.log('Unsupportted event: ' + eventName);
+    return;
+  }
+  g_listeners[++g_next_listener_id] = callback;
 };
 
 function _AsyncCall(type, resolve, reject) {

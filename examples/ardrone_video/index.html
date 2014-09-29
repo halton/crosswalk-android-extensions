@@ -34,7 +34,12 @@ window.onload = function() {
     video.play();
   }, 0);
 
-  xwalk.experimental.ardrone.video.play();
+  xwalk.experimental.ardrone.video.play()
+    .then(function() {
+      console.log('Play okay');
+    }, function(e) {
+      console.log(e.message);
+    });
 }
 </script>
 
