@@ -12,17 +12,17 @@ import org.json.JSONObject;
 public class ARDroneVideoOption {
     private static final String TAG = "ARDroneVideoOption";
 
-    public String mIpAddress;
-    public long mPort;
-    public long mLatency;
-    public long mBitrate;
-    public ARDroneVideoCodec mCodec;
-    public ARDroneVideoChannel mChannel;
+    private String mIpAddress;
+    private int mPort;
+    private long mLatency;
+    private long mBitrate;
+    private ARDroneVideoCodec mCodec;
+    private ARDroneVideoChannel mChannel;
 
     public ARDroneVideoOption(JSONObject option) {
         try {
             mIpAddress = option.getString("ipAddress");
-            mPort = option.getLong("port");
+            mPort = option.getInt("port");
             mLatency = option.getLong("latency");
             mBitrate = option.getLong("bitrate");
 
@@ -51,4 +51,11 @@ public class ARDroneVideoOption {
             Log.e(TAG, e.toString());
         }
     }
+
+    public String ipAddress() { return mIpAddress; }
+    public int port() { return mPort; }
+    public long latency () { return mLatency; }
+    public long bitrate() { return mBitrate; }
+    public ARDroneVideoCodec codec() { return mCodec; }
+    public ARDroneVideoChannel channel() { return mChannel; }
 }
