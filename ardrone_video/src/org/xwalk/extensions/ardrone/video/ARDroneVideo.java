@@ -15,6 +15,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Date;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -28,7 +29,7 @@ public class ARDroneVideo extends XWalkExtensionClient {
     private ARDroneVideoOption mOption;
     private InputStream mVideoStream;
     private Thread mParse2RawH264Thread;
-    private FileOutputStream mH264OutputStream;
+    private DecodeRunnable mRunnable;
 
     private Context mContext;
 
@@ -39,16 +40,12 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
     @Override
     public void onResume() {
+        if (mRunnable != null) mRunnable.onResume();
     }
 
     @Override
     public void onPause() {
-        cleanUp();
-    }
-
-    @Override
-    public void onStop() {
-        cleanUp();
+        if (mRunnable != null) mRunnable.onPause();
     }
 
     @Override
@@ -107,7 +104,6 @@ public class ARDroneVideo extends XWalkExtensionClient {
         if (mOption.codec() == ARDroneVideoCodec.UNKNOWN || mOption.channel() == ARDroneVideoChannel.UNKNOWN)
             return setErrorMessage("Wrong options passed in.");
 
-        Log.i(TAG, "From handlePlay()");
         try {
             InetAddress address = null;
             // TODO(halton): use -java7 to support multiple catch
@@ -120,23 +116,10 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
             Socket socket = new Socket(address, mOption.port());
             mVideoStream = socket.getInputStream();
-            File cacheDir = mContext.getCacheDir();
-            File file = new File(cacheDir, "test.h264");
-            mH264OutputStream = new FileOutputStream(file, true);
-            mParse2RawH264Thread = new Thread(new Runnable() {
-                @Override 
-                public void run() {
-                    while (true) {
-                        try {
-                            int length = ParsePaVEHeader.parseHeader(mVideoStream);
-                            byte[] bytes = ParsePaVEHeader.readPacket(mVideoStream, length);
-                            mH264OutputStream.write(bytes);
-                        } catch (IOException e) {
-                            Log.e(TAG, e.toString());
-                        }
-                    }
-                }
-            });
+            // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+            // executor.scheduleAtFixedRate(mVideoRunnable, 0, mOption.latency(), TimeUnit.MILLISECONDS);
+            mRunnable = new DecodeRunnable();
+            mParse2RawH264Thread = new Thread(mRunnable);
             mParse2RawH264Thread.start();
         } catch (IOException e) {
             Log.e(TAG, e.toString());
@@ -151,18 +134,108 @@ public class ARDroneVideo extends XWalkExtensionClient {
     }
 
     private void cleanUp() {
+        if (mRunnable != null) mRunnable.cleanUp();
+
         if (mParse2RawH264Thread != null) {
             mParse2RawH264Thread.interrupt();
             mParse2RawH264Thread = null;
         }
+    }
 
-        if (mH264OutputStream != null) {
+    private class DecodeRunnable implements Runnable {
+        private Object mPauseLock;
+        private boolean mPaused;
+        private boolean mFinished;
+        private boolean mVideoFileOdd;
+        private Date startTime;
+        private int mCounter;
+
+        private FileOutputStream mH264OutputStream;
+
+        public DecodeRunnable() {
+            mPauseLock = new Object();
+            mPaused = false;
+            mFinished = false;
+            mVideoFileOdd = true;
+            startTime = new Date();
+            mCounter = 0;
+        }
+
+        @Override
+        public void run() {
+            updateOutputStream();
+
+            while (!mFinished) {
+                // Change filename in every mOption.latency() milliseconds.
+                Date currentTime = new Date();
+                if (currentTime.getTime() - startTime.getTime() >= mOption.latency()) {
+                    try {
+                        mH264OutputStream.close();
+                    } catch (IOException e) {
+                        Log.e(TAG, e.toString());
+                    }
+
+                    mVideoFileOdd = !mVideoFileOdd;
+                    startTime = currentTime;
+                    updateOutputStream();
+                }
+
+                try {
+                    int length = ParsePaVEHeader.parseHeader(mVideoStream);
+                    byte[] bytes = ParsePaVEHeader.readPacket(mVideoStream, length);
+                    mH264OutputStream.write(bytes);
+                } catch (IOException e) {
+                    Log.e(TAG, e.toString());
+                }
+
+                synchronized (mPauseLock) {
+                    while (mPaused) {
+                        try {
+                            mPauseLock.wait();
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                }
+            }
+        }
+
+        public void onPause() {
+            synchronized (mPauseLock) {
+                mPaused = true;
+            }
+        }
+
+        public void onResume() {
+            synchronized (mPauseLock) {
+                mPaused = false;
+                mPauseLock.notifyAll();
+            }
+        }
+
+        public void cleanUp() {
+          if (mH264OutputStream != null) {
+              try {
+                  mH264OutputStream.flush();
+                  mH264OutputStream.close();
+              } catch (IOException e) {
+                  Log.e(TAG, e.toString());
+              }
+          }
+        }
+
+        private void updateOutputStream() {
+            if (mCounter > 1) return;
+
+            ++mCounter;
+            String fileNumber = mVideoFileOdd ? "1" : "2";
+            File file = new File(mContext.getCacheDir(), "raw" + fileNumber + ".h264");
             try {
-                mH264OutputStream.flush();
-                mH264OutputStream.close();
+                Log.i(TAG, "Current file is: " + file.getAbsolutePath());
+                mH264OutputStream = new FileOutputStream(file, false);
             } catch (IOException e) {
                 Log.e(TAG, e.toString());
             }
         }
     }
+
 }

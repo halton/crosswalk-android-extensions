@@ -54,7 +54,7 @@ public class ARDroneVideoOption {
 
     public String ipAddress() { return mIpAddress; }
     public int port() { return mPort; }
-    public long latency () { return mLatency; }
+    public long latency() { return mLatency; }
     public long bitrate() { return mBitrate; }
     public ARDroneVideoCodec codec() { return mCodec; }
     public ARDroneVideoChannel channel() { return mChannel; }
