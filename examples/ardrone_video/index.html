@@ -34,7 +34,9 @@ window.onload = function() {
     video.play();
   }, 0);
 
-  xwalk.experimental.ardrone.video.play()
+  option = new ARDroneVideoOption();
+  option.ipAddress = "192.168.1.103";
+  xwalk.experimental.ardrone.video.play(option)
     .then(function() {
       console.log('Play okay');
     }, function(e) {
