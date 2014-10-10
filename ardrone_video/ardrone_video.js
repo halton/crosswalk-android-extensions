@@ -79,7 +79,7 @@ extension.setMessageListener(function(json) {
   var msg = JSON.parse(json);
 
   // Handle events
-  if (msg.reply == 'newvideofile') {
+  if (msg.reply == 'newvideoready') {
     for (var id in g_listeners) {
       var event = new ARDroneVideoEvent(msg.data);
       g_listeners[id](event);

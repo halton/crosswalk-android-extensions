@@ -4,65 +4,65 @@
 
 package org.xwalk.extensions.ardrone.video;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 
 /*
- * Usage:
- * int length = ParsePaVEHeader.parseHeader(inputStream);
- * byte[] bytes = ParsePaVEHeader.readPacket(inputStream, length);
+ * The PaVE header defination can be found at
+ * https://github.com/elliotwoods/ARDrone-GStreamer-test/blob/master/plugin/src/pave.h
  */
+public class P264Decoder {
+    private static final String TAG = "P264Decoder";
+    private byte[] mStartFrame;
 
-public class ParsePaVEHeader {
-    private static final String TAG = "ParsePaVEHeader";
-
-    public static final int unsignedIntBytes2Int(byte[] bytes) {
-        int res = 0;
-        if (bytes == null) {
-            return res;
-        }
-
-        for (int i = 0; i < bytes.length; i++) {
-            res = res | ((bytes[i] & 0xff) << i * 8);
-        }
-        return res;
+    public P264Decoder () {
+        mStartFrame = null;
     }
 
-    public static final int parseHeader(InputStream inputStream) throws IOException {
-        int length = 0;
-        byte[] bytes = new byte[4];
-        inputStream.read(bytes, 0, 4); // "PaVE".
-        bytes = new byte[2];
-        inputStream.read(bytes, 0, 2); // version and video_codec.
-        bytes = new byte[2];
-        inputStream.read(bytes, 0, 2); // header size.
-        bytes = new byte[4];
-        inputStream.read(bytes, 0, 4); // payload size. store as length.
-        length = unsignedIntBytes2Int(bytes);
-        bytes = new byte[4];
-        inputStream.read(bytes, 0, 4); // stream width and height.
-        bytes = new byte[2];
-        inputStream.read(bytes, 0, 2); // display width.
-        bytes = new byte[2];
-        inputStream.read(bytes, 0, 2); // display height.
-        bytes = new byte[56];
-        inputStream.read(bytes, 0, 56); // ignored bytes for header. total 76 bytes.
-        return length;
-    }
+    // Return buffer start with IDR-Frame, end with previous frame before second IDR-Frame
+    public byte[] readFrames(InputStream inputStream) throws IOException {
+        P264Frame frame = new P264Frame();
+        byte[] result = null;
 
-    public static final byte[] readPacket(InputStream inputStream, int length) throws IOException {
-        byte[] bytes = new byte[length];
-        int index = 0;
-        int position = 0;
+        frame.getNextH264RawFrame(inputStream);
 
-        while (index < length) {
-            position = inputStream.read(bytes, index, length - index);
-            if (position <= 0) {
+        // Check whether it is first-time reading.
+        if (mStartFrame == null) {
+            if (!frame.isStartFrame()) return null;
+
+            mStartFrame = frame.getPayload().clone();
+            result = mStartFrame.clone();
+        } else {
+            result = appendData(mStartFrame, frame.getPayload().clone());
+        }
+
+        // Appending P-Frames until meet next IDR-Frame
+        while(true) {
+            frame.getNextH264RawFrame(inputStream);
+            if (frame.isStartFrame()) {
+                mStartFrame = frame.getPayload().clone();
                 break;
             }
-            index = index + position;
+
+            result = appendData(result, frame.getPayload().clone());
         }
 
-        return bytes;
+        return result;
+    }
+
+    protected byte[] appendData(byte[] arr1,byte[] arr2) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try {
+            if (arr1 != null && arr1.length != 0)
+                outputStream.write(arr1);
+            if (arr2 != null && arr2.length != 0)   
+                outputStream.write(arr2);
+        } catch (IOException e) {
+            Log.e(TAG, e.toString());
+        }
+        return outputStream.toByteArray();
     }
 }

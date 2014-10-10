@@ -57,6 +57,10 @@ public class ARDroneVideo extends XWalkExtensionClient {
     }
 
     @Override
+    public void onStop() {
+        cleanUp();
+    }
+    @Override
     public void onDestroy() {
         cleanUp();
     }
@@ -154,62 +158,73 @@ public class ARDroneVideo extends XWalkExtensionClient {
         private Object mPauseLock;
         private boolean mPaused;
         private boolean mFinished;
-        private boolean mVideoFileOdd;
-        private Date startTime;
-        private int mCounter;
 
-        private FileOutputStream mH264OutputStream;
-        private File mH264File;
-        private File mMp4File;
+        private int mVideoCounter;
+        private Date startTime;
+
+        private File mRawH264Dir;
+        private File mMp4Dir;
 
         public DecodeRunnable() {
             mPauseLock = new Object();
             mPaused = false;
             mFinished = false;
-            mVideoFileOdd = true;
+
+            mVideoCounter = 0;
             startTime = new Date();
-            mCounter = 0;
+            mRawH264Dir = null;
+            mMp4Dir = null;
         }
 
         @Override
         public void run() {
-            updateOutputStream();
+            P264Decoder p264Decoder = new P264Decoder();
+
+            if (mRawH264Dir == null) {
+                mRawH264Dir = new File(mContext.getCacheDir() + "/raw");
+            }
+            if (mMp4Dir == null) {
+                mMp4Dir = new File(mContext.getCacheDir() + "/mp4");
+            }
+
+            // Clean and Create dir for mp4 files
+            cleanUpTempDirs();
+            mRawH264Dir.mkdir();
+            mMp4Dir.mkdir();
 
             while (!mFinished) {
-                // Change filename in every mOption.latency() milliseconds.
                 Date currentTime = new Date();
-                if (currentTime.getTime() - startTime.getTime() >= mOption.latency()) {
+                ++mVideoCounter;
 
-                    ++mCounter;
-                    try {
-                        if (mH264OutputStream != null) {
-                            mH264OutputStream.flush();
-                            mH264OutputStream.close();
-                        }
-                    } catch (IOException e) {
-                        Log.e(TAG, e.toString());
-                    }
-
-                    mutexToMp4();
-                    mVideoFileOdd = !mVideoFileOdd;
-                    startTime = currentTime;
-                    if (mCounter > 1) {
-                        synchronized (mPauseLock) {
-                            mPaused = true;
-                        }
-                    } else {
-                        updateOutputStream();
-                    }
-                }
-
+                File h264File = new File(mRawH264Dir, mVideoCounter + ".h264");
+                File mp4File = new File(mMp4Dir, mVideoCounter + ".mp4");
                 try {
-                    if (mH264OutputStream != null) {
-                        int length = ParsePaVEHeader.parseHeader(mVideoStream);
-                        byte[] bytes = ParsePaVEHeader.readPacket(mVideoStream, length);
-                        mH264OutputStream.write(bytes);
-                    }
+                    byte[] bytes = p264Decoder.readFrames(mVideoStream);
+                    Log.i(TAG, "Current h264 file is: " + h264File.getAbsolutePath() + "buffer size:" + bytes.length);
+                    Log.i(TAG, "duration of " + mVideoCounter + " is: " + (currentTime.getTime() - startTime.getTime()));
+                    startTime = currentTime;
+
+                    if (bytes == null) continue;
+
+                    FileOutputStream h264OutputStream = new FileOutputStream(h264File, false);
+                    h264OutputStream.write(bytes);
+                    h264OutputStream.flush();
+                    h264OutputStream.close();
+
+                    Log.i(TAG, "Current mp4 file is " + mp4File.getAbsolutePath());
+                    muxerH264ToMp4(h264File, mp4File);
                 } catch (IOException e) {
                     Log.e(TAG, e.toString());
+                }
+
+                JSONObject out = new JSONObject();
+                try {
+                    out.put("reply", "newvideofile");
+                    out.put("data", "mp4/" + mVideoCounter + ".mp4");
+
+                    broadcastMessage(out.toString());
+                } catch (JSONException e) {
+                    printErrorMessage(e);
                 }
 
                 synchronized (mPauseLock) {
@@ -237,42 +252,23 @@ public class ARDroneVideo extends XWalkExtensionClient {
         }
 
         public void cleanUp() {
-          if (mH264OutputStream != null) {
-              try {
-                  mH264OutputStream.flush();
-                  mH264OutputStream.close();
-              } catch (IOException e) {
-                  Log.e(TAG, e.toString());
-              }
-          }
+            cleanUpTempDirs();
         }
 
-        private void updateOutputStream() {
-            String fileNumber = mVideoFileOdd ? "1" : "2";
-            mH264File = new File(mContext.getCacheDir(), fileNumber + ".h264");
-            try {
-                Log.i(TAG, "Current file is: " + mH264File.getAbsolutePath());
-                mH264OutputStream = new FileOutputStream(mH264File, false);
-            } catch (IOException e) {
-                Log.e(TAG, e.toString());
-            }
+        private void cleanUpTempDirs() {
+            if (mRawH264Dir != null) deleteDir(mRawH264Dir);
+            if (mMp4Dir != null) deleteDir(mMp4Dir);
         }
 
-        private void mutexToMp4() {
-            Log.i(TAG, "Current h264 file is " + mH264File.getAbsolutePath());
-
+        private void muxerH264ToMp4(File h264File, File mp4File) {
             try {
-                H264TrackImpl h264Track = new H264TrackImpl(new FileDataSourceImpl(mH264File.getAbsolutePath()));
+                H264TrackImpl h264Track = new H264TrackImpl(new FileDataSourceImpl(h264File.getAbsolutePath()));
                 Movie m = new Movie();
                 m.addTrack(h264Track);
 
                 Container out = new DefaultMp4Builder().build(m);
 
-                String fileNumber = mVideoFileOdd ? "1" : "2";
-                mMp4File = new File(mH264File.getParent(), fileNumber + ".mp4");
-                Log.i(TAG, "Current mp4 file is " + mMp4File.getAbsolutePath());
-
-                FileOutputStream fos = new FileOutputStream(mMp4File);
+                FileOutputStream fos = new FileOutputStream(mp4File);
                 FileChannel fc = fos.getChannel();
                 out.writeContainer(fc);
                 fos.close();
@@ -281,6 +277,19 @@ public class ARDroneVideo extends XWalkExtensionClient {
                 Log.e(TAG, e.toString());
             }
         }
-    }
 
+        private boolean deleteDir(File dir) {
+            if (dir.isDirectory()) {
+                String[] children = dir.list();
+                for (int i = 0; i < children.length; i++) {
+                    boolean success = deleteDir(new File(dir, children[i]));
+                    if (!success) {
+                        return false;
+                    }
+                }
+            }
+            return dir.delete();
+        }
+
+    }
 }
