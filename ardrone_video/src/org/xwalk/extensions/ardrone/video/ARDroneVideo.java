@@ -22,6 +22,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.channels.FileChannel;
 import java.util.Date;
 
 import org.json.JSONException;
@@ -158,6 +159,8 @@ public class ARDroneVideo extends XWalkExtensionClient {
         private int mCounter;
 
         private FileOutputStream mH264OutputStream;
+        private File mH264File;
+        private File mMp4File;
 
         public DecodeRunnable() {
             mPauseLock = new Object();
@@ -176,21 +179,35 @@ public class ARDroneVideo extends XWalkExtensionClient {
                 // Change filename in every mOption.latency() milliseconds.
                 Date currentTime = new Date();
                 if (currentTime.getTime() - startTime.getTime() >= mOption.latency()) {
+
+                    ++mCounter;
                     try {
-                        mH264OutputStream.close();
+                        if (mH264OutputStream != null) {
+                            mH264OutputStream.flush();
+                            mH264OutputStream.close();
+                        }
                     } catch (IOException e) {
                         Log.e(TAG, e.toString());
                     }
 
+                    mutexToMp4();
                     mVideoFileOdd = !mVideoFileOdd;
                     startTime = currentTime;
-                    updateOutputStream();
+                    if (mCounter > 1) {
+                        synchronized (mPauseLock) {
+                            mPaused = true;
+                        }
+                    } else {
+                        updateOutputStream();
+                    }
                 }
 
                 try {
-                    int length = ParsePaVEHeader.parseHeader(mVideoStream);
-                    byte[] bytes = ParsePaVEHeader.readPacket(mVideoStream, length);
-                    mH264OutputStream.write(bytes);
+                    if (mH264OutputStream != null) {
+                        int length = ParsePaVEHeader.parseHeader(mVideoStream);
+                        byte[] bytes = ParsePaVEHeader.readPacket(mVideoStream, length);
+                        mH264OutputStream.write(bytes);
+                    }
                 } catch (IOException e) {
                     Log.e(TAG, e.toString());
                 }
@@ -231,14 +248,35 @@ public class ARDroneVideo extends XWalkExtensionClient {
         }
 
         private void updateOutputStream() {
-            if (mCounter > 1) return;
-
-            ++mCounter;
             String fileNumber = mVideoFileOdd ? "1" : "2";
-            File file = new File(mContext.getCacheDir(), "raw" + fileNumber + ".h264");
+            mH264File = new File(mContext.getCacheDir(), fileNumber + ".h264");
             try {
-                Log.i(TAG, "Current file is: " + file.getAbsolutePath());
-                mH264OutputStream = new FileOutputStream(file, false);
+                Log.i(TAG, "Current file is: " + mH264File.getAbsolutePath());
+                mH264OutputStream = new FileOutputStream(mH264File, false);
+            } catch (IOException e) {
+                Log.e(TAG, e.toString());
+            }
+        }
+
+        private void mutexToMp4() {
+            Log.i(TAG, "Current h264 file is " + mH264File.getAbsolutePath());
+
+            try {
+                H264TrackImpl h264Track = new H264TrackImpl(new FileDataSourceImpl(mH264File.getAbsolutePath()));
+                Movie m = new Movie();
+                m.addTrack(h264Track);
+
+                Container out = new DefaultMp4Builder().build(m);
+
+                String fileNumber = mVideoFileOdd ? "1" : "2";
+                mMp4File = new File(mH264File.getParent(), fileNumber + ".mp4");
+                Log.i(TAG, "Current mp4 file is " + mMp4File.getAbsolutePath());
+
+                FileOutputStream fos = new FileOutputStream(mMp4File);
+                FileChannel fc = fos.getChannel();
+                out.writeContainer(fc);
+                fos.close();
+
             } catch (IOException e) {
                 Log.e(TAG, e.toString());
             }
