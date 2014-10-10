@@ -18,7 +18,7 @@ window.onload = function() {
 
   function updateCanvas() {
     if (!video.paused && !video.ended) {
-      ctx.drawImage(videoNormal, 0, 0);
+      ctx.drawImage(video, 0, 0);
     }
   }
 
@@ -27,16 +27,14 @@ window.onload = function() {
     canvasTimer = window.requestInterval(updateCanvas, 1000 / 15); // 15fps
   }, 0);
 
-  xwalk.experimental.ardrone.video.addEventListener('newvideoready', function (e) {
-    var cacheDir = typeof xwalk === 'object' ?
-                   xwalk.experimental.native_file_system.getRealPath('CACHEDIR') : null;
-    video.src = 'file://' + cacheDir + '/' + e.videoFile;
+  xwalk.experimental.ardrone.video.addEventListener('newvideoready', function(e) {
+    video.src = 'file://' + e.absolutePath;
     video.play();
-  }, 0);
+  });
 
   option = new ARDroneVideoOption();
   // customize you ARDrone ip address here.
-  option.ipAddress = "192.168.1.103";
+  option.ipAddress = "192.168.1.1";
   xwalk.experimental.ardrone.video.play(option)
     .then(function() {
       console.log('Play okay');

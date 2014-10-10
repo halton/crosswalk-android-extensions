@@ -219,8 +219,10 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
                 JSONObject out = new JSONObject();
                 try {
-                    out.put("reply", "newvideofile");
-                    out.put("data", "mp4/" + mVideoCounter + ".mp4");
+                    out.put("reply", "newvideoready");
+                    JSONObject path = new JSONObject();
+                    path.put("absolutePath", mp4File.getAbsolutePath());
+                    out.put("data", path);
 
                     broadcastMessage(out.toString());
                 } catch (JSONException e) {

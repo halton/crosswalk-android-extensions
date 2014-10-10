@@ -39,7 +39,7 @@ interface ARDroneVideo : EventTarget {
 };
 
 dictionary ARDroneVideoEventInit : EventInit {
-    readonly attribute DOMString videoFile;
+    readonly attribute DOMString absolutePath;
 };
 
 [

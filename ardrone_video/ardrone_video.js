@@ -70,8 +70,16 @@ exports.stop = function() {
   return _createPromise(msg);
 };
 
+function _addConstProperty(obj, propertyKey, propertyValue) {
+  Object.defineProperty(obj, propertyKey, {
+    configurable: false,
+    writable: false,
+    value: propertyValue
+  });
+}
+
 window.ARDroneVideoEvent = function(data) {
-  _addConstProperty(this, 'videoFile', _createConstClone(data));
+  _addConstProperty(this, 'absolutePath', data.absolutePath);
   this.prototype = new Event('ARDroneVideoEvent');
 };
 
@@ -82,8 +90,9 @@ extension.setMessageListener(function(json) {
   if (msg.reply == 'newvideoready') {
     for (var id in g_listeners) {
       var event = new ARDroneVideoEvent(msg.data);
-      g_listeners[id](event);
+      g_listeners[id]['callback'](event);
     }
+    return;
   }
 
   // Handle promises
@@ -102,7 +111,15 @@ exports.addEventListener = function(eventName, callback) {
     console.log('Unsupportted event: ' + eventName);
     return;
   }
-  g_listeners[++g_next_listener_id] = callback;
+
+  var listener = {
+    'eventName': eventName,
+    'callback': callback
+  };
+
+  var listener_id = g_next_listener_id;
+  g_next_listener_id += 1;
+  g_listeners[listener_id] = listener;
 };
 
 function _AsyncCall(type, resolve, reject) {
