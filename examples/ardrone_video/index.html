@@ -35,6 +35,7 @@ window.onload = function() {
   }, 0);
 
   option = new ARDroneVideoOption();
+  // customize you ARDrone ip address here.
   option.ipAddress = "192.168.1.103";
   xwalk.experimental.ardrone.video.play(option)
     .then(function() {
