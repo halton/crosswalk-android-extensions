@@ -15,12 +15,16 @@ var ARDroneVideoCodec = {
   P264: 2
 };
 
+window.ARDroneVideoCodec = ARDroneVideoCodec;
+
 var ARDroneVideoChannel = {
   ZAP_CHANNEL_HORI : 1,
   ZAP_CHANNEL_VERT : 2,
   ZAP_CHANNEL_LARGE_HORI_SMALL_VERT : 3,
   ZAP_CHANNEL_LARGE_VERT_SMALL_HORI : 4
 };
+
+window.ARDroneVideoChannel = ARDroneVideoChannel;
 
 function ARDroneVideoOption (){
   this.ipAddress = '192.168.1.1';
@@ -30,6 +34,8 @@ function ARDroneVideoOption (){
   this.codec = ARDroneVideoCodec.P264;
   this.channel = ARDroneVideoChannel.ZAP_CHANNEL_HORI;
 };
+
+window.ARDroneVideoOption = ARDroneVideoOption;
 
 exports.isPlaying = false;
 
