@@ -9,7 +9,7 @@ var g_listeners = [];
 var g_next_listener_id = 0;
 
 var g_video = null;
-var g_canvasTimer = null;
+var g_canvas_timer = null;
 var g_last_mp4_file = null;
 
 var ARDroneVideoCodec = {
@@ -57,13 +57,14 @@ exports.play = function(idOfCanvas, option) {
 
   var ctx = canvas.getContext('2d');
   if (!ctx) {
-    console.log('Fail to get canvas context, is ' + idOfCanvas + ' a valid canvas element?');
+    console.log('Failed to get canvas context, is ' + idOfCanvas + ' a valid canvas element?');
     return;
   }
 
   // Create a tempory hidden video element
   g_video = document.createElement('video');
   g_video.removeAttribute("controls");
+  g_video.removeAttribute("autoplay");
   g_video.setAttribute("hidden", "hidden");
   g_video.setAttribute("preload", "auto");
 
@@ -75,14 +76,14 @@ exports.play = function(idOfCanvas, option) {
     }
   }
 
-  g_video.addEventListener('pause', _clearCanvasTimer, true);
-  g_video.addEventListener('ended', _clearCanvasTimer, true);
-  g_video.addEventListener('abort', _clearCanvasTimer, true);
+  g_video.addEventListener('play', function() {
+    _clearCanvasTimer();
 
-  g_video.addEventListener('canplay', function() { g_video.play(); }, true);
-  g_video.addEventListener('playing', function() {
-    // TODO(halton): hard-code 25 FPS
-    g_canvasTimer = window.requestInterval(_updateCanvas, 1000 / 25);
+    // TODO(halton): hard-code 30 FPS
+    var timer = window.requestInterval(_updateCanvas, 1000 / 30);
+
+    g_canvas_timer = new Object();
+    g_canvas_timer.value = timer.value;
   }, true);
 
   exports.addEventListener('newvideoready', function(e) {
@@ -91,7 +92,7 @@ exports.play = function(idOfCanvas, option) {
     g_last_mp4_file = e.absolutePath;
 
     g_video.src = 'file://' + e.absolutePath;
-    g_video.load();
+    g_video.play();
   });
 
   if (_isARDroneVideoOption(option)) {
@@ -109,10 +110,10 @@ exports.play = function(idOfCanvas, option) {
 };
 
 function _clearCanvasTimer() {
-  if (!g_canvasTimer) return;
+  if (g_canvas_timer && g_canvas_timer.value)
+    window.clearRequestInterval(g_canvas_timer);
 
-  window.clearRequestInterval(g_canvasTimer);
-  g_canvasTimer = null;
+  g_canvas_timer = null;
 }
 
 function _removeLastMp4File() {
@@ -247,14 +248,14 @@ function _isARDroneVideoOption(option) {
 // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
 // Copied from https://gist.github.com/joelambert/1002116
 window.requestAnimFrame = (function() {
-    return  window.requestAnimationFrame       ||
-            window.webkitRequestAnimationFrame ||
-            window.mozRequestAnimationFrame    ||
-            window.oRequestAnimationFrame      ||
-            window.msRequestAnimationFrame     ||
-            function(/* function */ callback, /* DOMElement */ element){
-                window.setTimeout(callback, 1000 / 60)
-            };
+  return window.requestAnimationFrame       ||
+         window.webkitRequestAnimationFrame ||
+         window.mozRequestAnimationFrame    ||
+         window.oRequestAnimationFrame      ||
+         window.msRequestAnimationFrame     ||
+         function(/* function */ callback, /* DOMElement */ element){
+           window.setTimeout(callback, 1000 / 60)
+         };
 })();
 
 /**
@@ -265,30 +266,31 @@ window.requestAnimFrame = (function() {
  * @param {int} delay The delay in milliseconds
  */
 window.requestInterval = function(fn, delay) {
-    if( !window.requestAnimationFrame       &&
-        !window.webkitRequestAnimationFrame &&
-        !(window.mozRequestAnimationFrame && window.mozCancelRequestAnimationFrame) && // Firefox 5 ships without cancel support
-        !window.oRequestAnimationFrame      &&
-        !window.msRequestAnimationFrame)
-            return window.setInterval(fn, delay);
+  if (!window.requestAnimationFrame &&
+      !window.webkitRequestAnimationFrame &&
+      // Firefox 5 ships without cancel support
+      !(window.mozRequestAnimationFrame && window.mozCancelRequestAnimationFrame) &&
+      !window.oRequestAnimationFrame &&
+      !window.msRequestAnimationFrame)
+      return window.setInterval(fn, delay);
 
-    var start = new Date().getTime(),
-        handle = new Object();
+  var start = new Date().getTime(),
+      handle = new Object();
 
-    function loop() {
-        var current = new Date().getTime(),
-            delta = current - start;
+  function loop() {
+    var current = new Date().getTime(),
+          delta = current - start;
 
-        if(delta >= delay) {
-            fn.call();
-            start = new Date().getTime();
-        }
-
-        handle.value = requestAnimFrame(loop);
-    };
+    if(delta >= delay) {
+      fn.call();
+      start = new Date().getTime();
+    }
 
     handle.value = requestAnimFrame(loop);
-    return handle;
+  };
+
+  handle.value = requestAnimFrame(loop);
+  return handle;
 }
 
 /**
@@ -298,11 +300,12 @@ window.requestInterval = function(fn, delay) {
  * @param {int|object} fn The callback function
  */
 window.clearRequestInterval = function(handle) {
-    window.cancelAnimationFrame ? window.cancelAnimationFrame(handle.value) :
-    window.webkitCancelAnimationFrame ? window.webkitCancelAnimationFrame(handle.value) :
-    window.webkitCancelRequestAnimationFrame ? window.webkitCancelRequestAnimationFrame(handle.value) : /* Support for legacy API */
-    window.mozCancelRequestAnimationFrame ? window.mozCancelRequestAnimationFrame(handle.value) :
-    window.oCancelRequestAnimationFrame    ? window.oCancelRequestAnimationFrame(handle.value) :
-    window.msCancelRequestAnimationFrame ? window.msCancelRequestAnimationFrame(handle.value) :
-    clearInterval(handle);
+  window.cancelAnimationFrame              ? window.cancelAnimationFrame(handle.value) :
+  window.webkitCancelAnimationFrame        ? window.webkitCancelAnimationFrame(handle.value) :
+  /* Support for legacy API */
+  window.webkitCancelRequestAnimationFrame ? window.webkitCancelRequestAnimationFrame(handle.value) :
+  window.mozCancelRequestAnimationFrame    ? window.mozCancelRequestAnimationFrame(handle.value) :
+  window.oCancelRequestAnimationFrame      ? window.oCancelRequestAnimationFrame(handle.value) :
+  window.msCancelRequestAnimationFrame     ? window.msCancelRequestAnimationFrame(handle.value) :
+  clearInterval(handle);
 };
