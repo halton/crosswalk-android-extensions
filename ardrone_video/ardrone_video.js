@@ -33,7 +33,7 @@ window.ARDroneVideoChannel = ARDroneVideoChannel;
 function ARDroneVideoOption (){
   this.ipAddress = '192.168.1.1';
   this.port = 5555;
-  this.latency = 1000; // how much duration for the pipeline, in millisecond
+  this.latency = -1; // milliseconds to update mp4 files, -1 means no control
   this.bitrate = 15000; // also called fps, in millisecond
   this.codec = ARDroneVideoCodec.P264;
   this.channel = ARDroneVideoChannel.ZAP_CHANNEL_HORI;

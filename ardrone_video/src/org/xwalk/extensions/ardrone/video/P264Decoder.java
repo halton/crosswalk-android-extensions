@@ -9,6 +9,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.Date;
 
 /*
  * The PaVE header defination can be found at
@@ -17,13 +18,15 @@ import java.io.ByteArrayOutputStream;
 public class P264Decoder {
     private static final String TAG = "P264Decoder";
     private byte[] mStartFrame;
+    private Date mStartTime;
 
     public P264Decoder () {
         mStartFrame = null;
+        mStartTime = new Date();
     }
 
     // Return buffer start with IDR-Frame, end with previous frame before second IDR-Frame
-    public byte[] readFrames(InputStream inputStream) throws IOException {
+    public byte[] readFrames(InputStream inputStream, long latency) throws IOException {
         P264Frame frame = new P264Frame();
         byte[] result = null;
 
@@ -40,14 +43,25 @@ public class P264Decoder {
         }
 
         // Appending P-Frames until meet next IDR-Frame
-        while(true) {
+        while (true) {
             frame.getNextH264RawFrame(inputStream);
-            if (frame.isStartFrame()) {
-                mStartFrame = frame.getPayload().clone();
-                break;
+            if (!frame.isStartFrame()) {
+                result = appendData(result, frame.getPayload().clone());
+                continue;
             }
 
-            result = appendData(result, frame.getPayload().clone());
+            mStartFrame = frame.getPayload().clone();
+
+            // Based on testing, two IDR-Frames duration always bigger than 100ms.
+            if (latency < 100) {
+                break;
+            } else {
+                Date currentTime = new Date();
+                if (currentTime.getTime() - mStartTime.getTime() > latency) {
+                    mStartTime = currentTime;
+                    break;
+                }
+            }
         }
 
         return result;

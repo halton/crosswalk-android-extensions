@@ -204,7 +204,7 @@ public class ARDroneVideo extends XWalkExtensionClient {
                 File h264File = new File(mVideoCachedDir, mVideoCounter + ".h264");
                 File mp4File = new File(mVideoCachedDir, mVideoCounter + ".mp4");
                 try {
-                    byte[] bytes = p264Decoder.readFrames(mVideoStream);
+                    byte[] bytes = p264Decoder.readFrames(mVideoStream, mOption.latency());
                     Log.i(TAG, "Current h264 file is: " + h264File.getAbsolutePath() + "buffer size:" + bytes.length);
                     Log.i(TAG, "Duration of " + mVideoCounter + " is: " + (currentTime.getTime() - startTime.getTime()));
                     startTime = currentTime;

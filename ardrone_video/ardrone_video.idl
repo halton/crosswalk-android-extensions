@@ -19,7 +19,7 @@ enum ARDroneVideoChannel {
 dictionary ARDroneVideoOption {
     unsigned DOMString ipAddress = "192.168.1.1";
     unsigned long port = 5555;
-    unsigned long latency = 1000; // how much duration for the pipeline, in millisecond
+    unsigned long latency = -1; // milliseconds to update mp4 files, -1 means no control
     unsigned long bitrate = 15000; // also called fps, in millisecond
     ARDroneVideoCodec codec = P264;
     ARDroneVideoChannel channel = ZAP_CHANNEL_HORI;
