@@ -24,7 +24,7 @@ window.onload = function() {
 
   var canvasTimer = null;
   video.addEventListener('play', function () {
-    canvasTimer = window.requestInterval(updateCanvas, 1000 / 15); // 15fps
+    canvasTimer = window.requestInterval(updateCanvas, 1000 / 25); // 25fps
   }, 0);
 
   xwalk.experimental.ardrone.video.addEventListener('newvideoready', function(e) {

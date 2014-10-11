@@ -128,8 +128,6 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
             Socket socket = new Socket(address, mOption.port());
             mVideoStream = socket.getInputStream();
-            // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-            // executor.scheduleAtFixedRate(mVideoRunnable, 0, mOption.latency(), TimeUnit.MILLISECONDS);
             mRunnable = new DecodeRunnable();
             mParse2RawH264Thread = new Thread(mRunnable);
             mParse2RawH264Thread.start();
@@ -172,6 +170,7 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
             mVideoCounter = 0;
             startTime = new Date();
+
             mRawH264Dir = null;
             mMp4Dir = null;
         }
@@ -213,20 +212,24 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
                     Log.i(TAG, "Current mp4 file is " + mp4File.getAbsolutePath());
                     muxerH264ToMp4(h264File, mp4File);
+
+                    h264File.delete();
                 } catch (IOException e) {
                     Log.e(TAG, e.toString());
                 }
 
-                JSONObject out = new JSONObject();
-                try {
-                    out.put("reply", "newvideoready");
-                    JSONObject path = new JSONObject();
-                    path.put("absolutePath", mp4File.getAbsolutePath());
-                    out.put("data", path);
+                if (mp4File.exists()) {
+                    JSONObject out = new JSONObject();
+                    try {
+                        out.put("reply", "newvideoready");
+                        JSONObject path = new JSONObject();
+                        path.put("absolutePath", mp4File.getAbsolutePath());
+                        out.put("data", path);
 
-                    broadcastMessage(out.toString());
-                } catch (JSONException e) {
-                    printErrorMessage(e);
+                        broadcastMessage(out.toString());
+                    } catch (JSONException e) {
+                        printErrorMessage(e);
+                    }
                 }
 
                 synchronized (mPauseLock) {
