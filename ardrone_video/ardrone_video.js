@@ -60,12 +60,11 @@ exports.play = function(idOfCanvas, option) {
     return;
   }
 
-  // Create a tempory video element with hidden, autoplay
+  // Create a tempory hidden video element
   g_video = document.createElement('video');
-  g_video.autoplay = true;
   g_video.removeAttribute("controls");
-  g_video.id = 'tmp_ardrone_video_id';
   g_video.setAttribute("hidden", "hidden");
+  g_video.setAttribute("preload", "auto");
 
   document.body.appendChild(g_video);
 
@@ -75,13 +74,20 @@ exports.play = function(idOfCanvas, option) {
     }
   }
 
-  g_video.addEventListener('play', function () {
+  g_video.addEventListener('pause', _clearCanvasTimer, true);
+  g_video.addEventListener('ended', _clearCanvasTimer, true);
+  g_video.addEventListener('abort', _clearCanvasTimer, true);
+
+  g_video.addEventListener('canplay', function() { g_video.play(); }, true);
+  g_video.addEventListener('playing', function() {
+    // TODO(halton): hard-code 25 FPS
     g_canvasTimer = window.requestInterval(_updateCanvas, 1000 / 25);
-  }, 0);
+  }, true);
 
   exports.addEventListener('newvideoready', function(e) {
+    g_video.pause();
     g_video.src = 'file://' + e.absolutePath;
-    g_video.play();
+    g_video.load();
   });
 
   if (_isARDroneVideoOption(option)) {
@@ -98,12 +104,15 @@ exports.play = function(idOfCanvas, option) {
   return _createPromise(msg);
 };
 
-function _cleanup() {
-  if (g_canvasTimer) {
-    window.clearRequestInterval(g_canvasTimer);
-    g_canvasTimer = null;
-  }
+function _clearCanvasTimer() {
+  if (!g_canvasTimer) return;
 
+  window.clearRequestInterval(g_canvasTimer);
+  g_canvasTimer = null;
+}
+
+function _cleanup() {
+  _clearCanvasTimer();
   if (g_video) {
     document.body.removeChild(g_video);
     g_video = null;
