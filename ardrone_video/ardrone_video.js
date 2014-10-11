@@ -10,6 +10,7 @@ var g_next_listener_id = 0;
 
 var g_video = null;
 var g_canvasTimer = null;
+var g_last_mp4_file = null;
 
 var ARDroneVideoCodec = {
   // A MJPG-like codec, which was the default one until 1.6.4.
@@ -86,6 +87,9 @@ exports.play = function(idOfCanvas, option) {
 
   exports.addEventListener('newvideoready', function(e) {
     g_video.pause();
+    _removeLastMp4File();
+    g_last_mp4_file = e.absolutePath;
+
     g_video.src = 'file://' + e.absolutePath;
     g_video.load();
   });
@@ -111,12 +115,22 @@ function _clearCanvasTimer() {
   g_canvasTimer = null;
 }
 
+function _removeLastMp4File() {
+  exports.removeFile(g_last_mp4_file)
+    .then(function() { },
+          function(e) { console.log(e.message); }
+         );
+}
+
 function _cleanup() {
   _clearCanvasTimer();
   if (g_video) {
     document.body.removeChild(g_video);
     g_video = null;
   }
+
+  _removeLastMp4File();
+  g_last_mp4_file = null;
 }
 
 exports.stop = function() {
@@ -129,6 +143,14 @@ exports.stop = function() {
 
   var msg = {
     'cmd': 'stop'
+  };
+  return _createPromise(msg);
+};
+
+exports.removeFile = function(path) {
+  var msg = {
+    'cmd': 'removeFile',
+    'path': path
   };
   return _createPromise(msg);
 };

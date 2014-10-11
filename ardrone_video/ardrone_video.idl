@@ -33,6 +33,7 @@ interface ARDroneVideo : EventTarget {
     // Methods
     Promise play(DOMString idOfCanvas, optional ARDroneVideoOption option);
     Promise stop();
+    Promise removeFile(DOMString path);
 
     // Events
     attribute EventHandler onnewvideoready;

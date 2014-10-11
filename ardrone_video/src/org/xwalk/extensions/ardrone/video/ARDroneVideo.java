@@ -79,6 +79,8 @@ public class ARDroneVideo extends XWalkExtensionClient {
                 jsonOutput.put("data", handlePlay(jsonInput.getJSONObject("option")));
             } else if (cmd.equals("stop")) {
                 jsonOutput.put("data", handleStop());
+            } else if (cmd.equals("removeFile")) {
+                jsonOutput.put("data", handleRemoveFile(jsonInput.getString("path")));
             } else {
                 jsonOutput.put("data", setErrorMessage("Unsupportted cmd " + cmd));
             }
@@ -143,6 +145,16 @@ public class ARDroneVideo extends XWalkExtensionClient {
         return new JSONObject();
     }
 
+    private JSONObject handleRemoveFile(String path) {
+        File f = new File(path);
+
+        if (!f.isFile()) return setErrorMessage("Invalid path: " + path);
+        if (!f.delete()) return setErrorMessage("Failed to delete path: " + path);
+
+        Log.i(TAG, "Successfully remove file: " + path);
+        return new JSONObject();
+    }
+
     private void cleanUp() {
         if (mRunnable != null) mRunnable.cleanUp();
 
@@ -160,8 +172,7 @@ public class ARDroneVideo extends XWalkExtensionClient {
         private int mVideoCounter;
         private Date startTime;
 
-        private File mRawH264Dir;
-        private File mMp4Dir;
+        private File mVideoCachedDir;
 
         public DecodeRunnable() {
             mPauseLock = new Object();
@@ -171,36 +182,31 @@ public class ARDroneVideo extends XWalkExtensionClient {
             mVideoCounter = 0;
             startTime = new Date();
 
-            mRawH264Dir = null;
-            mMp4Dir = null;
+            mVideoCachedDir = null;
         }
 
         @Override
         public void run() {
             P264Decoder p264Decoder = new P264Decoder();
 
-            if (mRawH264Dir == null) {
-                mRawH264Dir = new File(mContext.getCacheDir() + "/raw");
-            }
-            if (mMp4Dir == null) {
-                mMp4Dir = new File(mContext.getCacheDir() + "/mp4");
+            if (mVideoCachedDir == null) {
+                mVideoCachedDir = new File(mContext.getCacheDir() + "/video");
             }
 
-            // Clean and Create dir for mp4 files
-            cleanUpTempDirs();
-            mRawH264Dir.mkdir();
-            mMp4Dir.mkdir();
+            // Clean and recreated cached dir 
+            if (mVideoCachedDir != null) deleteDir(mVideoCachedDir);
+            mVideoCachedDir.mkdir();
 
             while (!mFinished) {
                 Date currentTime = new Date();
                 ++mVideoCounter;
 
-                File h264File = new File(mRawH264Dir, mVideoCounter + ".h264");
-                File mp4File = new File(mMp4Dir, mVideoCounter + ".mp4");
+                File h264File = new File(mVideoCachedDir, mVideoCounter + ".h264");
+                File mp4File = new File(mVideoCachedDir, mVideoCounter + ".mp4");
                 try {
                     byte[] bytes = p264Decoder.readFrames(mVideoStream);
                     Log.i(TAG, "Current h264 file is: " + h264File.getAbsolutePath() + "buffer size:" + bytes.length);
-                    Log.i(TAG, "duration of " + mVideoCounter + " is: " + (currentTime.getTime() - startTime.getTime()));
+                    Log.i(TAG, "Duration of " + mVideoCounter + " is: " + (currentTime.getTime() - startTime.getTime()));
                     startTime = currentTime;
 
                     if (bytes == null) continue;
@@ -257,12 +263,7 @@ public class ARDroneVideo extends XWalkExtensionClient {
         }
 
         public void cleanUp() {
-            cleanUpTempDirs();
-        }
-
-        private void cleanUpTempDirs() {
-            if (mRawH264Dir != null) deleteDir(mRawH264Dir);
-            if (mMp4Dir != null) deleteDir(mMp4Dir);
+            if (mVideoCachedDir != null) deleteDir(mVideoCachedDir);
         }
 
         private void muxerH264ToMp4(File h264File, File mp4File) {
