@@ -4,38 +4,21 @@
 
 <body>
 
-<video id="video" width="640" height="360" hidden></video>
-<canvas id="canvas" width="640" height="360"></canvas>
-
-<script src="js/requestAnimFrame.js"></script>
-<script src="js/requestInterval.js"></script>
+<canvas id="ardrone_video" width="640" height="360"></canvas>
 
 <script>
 window.onload = function() {
-  var video = document.getElementById('video');
-  var canvas = document.getElementById('canvas');
-  var ctx    = canvas.getContext('2d');
-
-  function updateCanvas() {
-    if (!video.paused && !video.ended) {
-      ctx.drawImage(video, 0, 0);
-    }
+  var droneVideo = xwalk.experimental.ardrone.video || null;
+  if (!droneVideo) {
+    console.log('xwalk.experimental.ardrone.video is not avilable.');
+    return;
   }
 
-  var canvasTimer = null;
-  video.addEventListener('play', function () {
-    canvasTimer = window.requestInterval(updateCanvas, 1000 / 25); // 25fps
-  }, 0);
-
-  xwalk.experimental.ardrone.video.addEventListener('newvideoready', function(e) {
-    video.src = 'file://' + e.absolutePath;
-    video.play();
-  });
-
+  // Customize your ARDrone ip address here.
   option = new ARDroneVideoOption();
-  // customize you ARDrone ip address here.
   option.ipAddress = "192.168.1.1";
-  xwalk.experimental.ardrone.video.play(option)
+
+  droneVideo.play('ardrone_video', option)
     .then(function() {
       console.log('Play okay');
     }, function(e) {

@@ -31,7 +31,7 @@ interface ARDroneVideo : EventTarget {
     readonly attribute boolean isPlaying;
 
     // Methods
-    Promise play(optional ARDroneVideoOption option);
+    Promise play(DOMString idOfCanvas, optional ARDroneVideoOption option);
     Promise stop();
 
     // Events

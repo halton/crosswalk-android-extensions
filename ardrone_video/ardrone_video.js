@@ -8,6 +8,9 @@ var g_next_async_call_id = 0;
 var g_listeners = [];
 var g_next_listener_id = 0;
 
+var g_video = null;
+var g_canvasTimer = null;
+
 var ARDroneVideoCodec = {
   // A MJPG-like codec, which was the default one until 1.6.4.
   VLIB: 1,
@@ -39,11 +42,48 @@ window.ARDroneVideoOption = ARDroneVideoOption;
 
 exports.isPlaying = false;
 
-exports.play = function(option) {
+exports.play = function(idOfCanvas, option) {
   if (exports.isPlaying) {
     console.log('Video is playing, please stop first.');
     return;
   }
+
+  var canvas = document.getElementById(idOfCanvas);
+  if (!canvas) {
+    console.log('Invalid canvas id: ' + idOfCanvas);
+    return;
+  }
+
+  var ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.log('Fail to get canvas context, is ' + idOfCanvas + ' a valid canvas element?');
+    return;
+  }
+
+  // Create a tempory video element with hidden, autoplay
+  g_video = document.createElement('video');
+  g_video.autoplay = true;
+  g_video.removeAttribute("controls");
+  g_video.id = 'tmp_ardrone_video_id';
+  g_video.setAttribute("hidden", "hidden");
+
+  document.body.appendChild(g_video);
+
+  function _updateCanvas() {
+    if (!g_video.paused && !g_video.ended) {
+      ctx.drawImage(g_video, 0, 0);
+    }
+  }
+
+  g_video.addEventListener('play', function () {
+    g_canvasTimer = window.requestInterval(_updateCanvas, 1000 / 25);
+  }, 0);
+
+  exports.addEventListener('newvideoready', function(e) {
+    g_video.src = 'file://' + e.absolutePath;
+    g_video.play();
+  });
+
   if (_isARDroneVideoOption(option)) {
     exports.option = option;
   } else if (!_isARDroneVideoOption(exports.option)) {
@@ -58,11 +98,25 @@ exports.play = function(option) {
   return _createPromise(msg);
 };
 
+function _cleanup() {
+  if (g_canvasTimer) {
+    window.clearRequestInterval(g_canvasTimer);
+    g_canvasTimer = null;
+  }
+
+  if (g_video) {
+    document.body.removeChild(g_video);
+    g_video = null;
+  }
+}
+
 exports.stop = function() {
   if (!exports.isPlaying) {
     console.log('Video is not playing, nothing to do.');
     return;
   }
+
+  _cleanup();
 
   var msg = {
     'cmd': 'stop'
@@ -157,3 +211,67 @@ function _isARDroneVideoOption(option) {
 
   return true;
 }
+
+// requestAnimationFrame() shim by Paul Irish
+// http://paulirish.com/2011/requestanimationframe-for-smart-animating/
+// Copied from https://gist.github.com/joelambert/1002116
+window.requestAnimFrame = (function() {
+    return  window.requestAnimationFrame       ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame    ||
+            window.oRequestAnimationFrame      ||
+            window.msRequestAnimationFrame     ||
+            function(/* function */ callback, /* DOMElement */ element){
+                window.setTimeout(callback, 1000 / 60)
+            };
+})();
+
+/**
+ * Copied from https://gist.github.com/joelambert/1002116
+ *
+ * Behaves the same as setInterval except uses requestAnimationFrame() where possible for better performance
+ * @param {function} fn The callback function
+ * @param {int} delay The delay in milliseconds
+ */
+window.requestInterval = function(fn, delay) {
+    if( !window.requestAnimationFrame       &&
+        !window.webkitRequestAnimationFrame &&
+        !(window.mozRequestAnimationFrame && window.mozCancelRequestAnimationFrame) && // Firefox 5 ships without cancel support
+        !window.oRequestAnimationFrame      &&
+        !window.msRequestAnimationFrame)
+            return window.setInterval(fn, delay);
+
+    var start = new Date().getTime(),
+        handle = new Object();
+
+    function loop() {
+        var current = new Date().getTime(),
+            delta = current - start;
+
+        if(delta >= delay) {
+            fn.call();
+            start = new Date().getTime();
+        }
+
+        handle.value = requestAnimFrame(loop);
+    };
+
+    handle.value = requestAnimFrame(loop);
+    return handle;
+}
+
+/**
+ * Copied from https://gist.github.com/joelambert/1002116
+ *
+ * Behaves the same as clearInterval except uses cancelRequestAnimationFrame() where possible for better performance
+ * @param {int|object} fn The callback function
+ */
+window.clearRequestInterval = function(handle) {
+    window.cancelAnimationFrame ? window.cancelAnimationFrame(handle.value) :
+    window.webkitCancelAnimationFrame ? window.webkitCancelAnimationFrame(handle.value) :
+    window.webkitCancelRequestAnimationFrame ? window.webkitCancelRequestAnimationFrame(handle.value) : /* Support for legacy API */
+    window.mozCancelRequestAnimationFrame ? window.mozCancelRequestAnimationFrame(handle.value) :
+    window.oCancelRequestAnimationFrame    ? window.oCancelRequestAnimationFrame(handle.value) :
+    window.msCancelRequestAnimationFrame ? window.msCancelRequestAnimationFrame(handle.value) :
+    clearInterval(handle);
+};
