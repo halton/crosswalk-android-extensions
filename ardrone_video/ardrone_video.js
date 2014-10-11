@@ -72,7 +72,7 @@ exports.play = function(idOfCanvas, option) {
 
   function _updateCanvas() {
     if (!g_video.paused && !g_video.ended) {
-      ctx.drawImage(g_video, 0, 0);
+      ctx.drawImage(g_video, 0, 0, canvas.width, canvas.height);
     }
   }
 
