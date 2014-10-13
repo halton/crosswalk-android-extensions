@@ -49,6 +49,7 @@ public class P264Frame {
     public boolean isStartFrame() {
         return mHeader[30] == P264FrameType.IDR_FRAME.getValue();
     }
+
     public byte[] getPayload() { return mPayload; }
 
     public boolean getNextH264RawFrame(InputStream inputStream) throws IOException {

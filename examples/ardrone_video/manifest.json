@@ -14,8 +14,6 @@
   "orientation": "landscape",
   "xwalk_permissions": [
     "Fullscreen",
-    "Geolocation",
-    "Presentation",
     "ScreenOrientation"
   ],
   "xwalk_hosts": [

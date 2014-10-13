@@ -243,6 +243,7 @@ public class ARDroneVideo extends XWalkExtensionClient {
                         try {
                             mPauseLock.wait();
                         } catch (InterruptedException e) {
+                            Log.e(TAG, e.toString());
                         }
                     }
                 }

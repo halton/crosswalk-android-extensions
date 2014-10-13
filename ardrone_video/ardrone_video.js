@@ -30,7 +30,7 @@ var ARDroneVideoChannel = {
 
 window.ARDroneVideoChannel = ARDroneVideoChannel;
 
-function ARDroneVideoOption (){
+function ARDroneVideoOption () {
   this.ipAddress = '192.168.1.1';
   this.port = 5555;
   this.latency = -1; // milliseconds to update mp4 files, -1 means no control
@@ -279,9 +279,9 @@ window.requestInterval = function(fn, delay) {
 
   function loop() {
     var current = new Date().getTime(),
-          delta = current - start;
+        delta = current - start;
 
-    if(delta >= delay) {
+    if (delta >= delay) {
       fn.call();
       start = new Date().getTime();
     }
