@@ -4,25 +4,16 @@
 
 package org.xwalk.extensions.ardrone.video;
 
-import android.util.Log;
 import android.content.Context;
-
-import com.coremedia.iso.boxes.Container;
-import com.googlecode.mp4parser.DataSource;
-import com.googlecode.mp4parser.FileDataSourceImpl;
-import com.googlecode.mp4parser.authoring.Movie;
-import com.googlecode.mp4parser.authoring.builder.DefaultMp4Builder;
-import com.googlecode.mp4parser.authoring.tracks.H264TrackImpl;
+import android.util.Log;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.channels.FileChannel;
 import java.util.Date;
 
 import org.json.JSONException;
@@ -222,29 +213,22 @@ public class ARDroneVideo extends XWalkExtensionClient {
             if (mVideoCachedDir != null) deleteDir(mVideoCachedDir);
             mVideoCachedDir.mkdir();
 
+            Mp4Muxer muxer = Mp4Muxer.createInstance(mVideoCachedDir);
+
             while (!mFinished) {
                 Date currentTime = new Date();
                 ++mVideoCounter;
 
-                File h264File = new File(mVideoCachedDir, mVideoCounter + ".h264");
                 File mp4File = new File(mVideoCachedDir, mVideoCounter + ".mp4");
+                Log.i(TAG, "Current mp4 file is " + mp4File.getAbsolutePath());
+
                 try {
                     byte[] bytes = p264Decoder.readFrames(mVideoStream, mOption.latency());
-                    Log.i(TAG, "Current h264 file is: " + h264File.getAbsolutePath() + "buffer size:" + bytes.length);
-                    Log.i(TAG, "Duration of " + mVideoCounter + " is: " + (currentTime.getTime() - startTime.getTime()));
-                    startTime = currentTime;
-
                     if (bytes == null) continue;
 
-                    FileOutputStream h264OutputStream = new FileOutputStream(h264File, false);
-                    h264OutputStream.write(bytes);
-                    h264OutputStream.flush();
-                    h264OutputStream.close();
-
-                    Log.i(TAG, "Current mp4 file is " + mp4File.getAbsolutePath());
-                    muxerH264ToMp4(h264File, mp4File);
-
-                    h264File.delete();
+                    Log.i(TAG, "Duration of " + mVideoCounter + " is: " + (currentTime.getTime() - startTime.getTime()));
+                    startTime = currentTime;
+                    muxer.h264FramesToMp4File(bytes, mp4File);
                 } catch (IOException e) {
                     Log.e(TAG, e.toString());
                 }
@@ -291,24 +275,6 @@ public class ARDroneVideo extends XWalkExtensionClient {
 
         public void cleanUp() {
             if (mVideoCachedDir != null) deleteDir(mVideoCachedDir);
-        }
-
-        private void muxerH264ToMp4(File h264File, File mp4File) {
-            try {
-                H264TrackImpl h264Track = new H264TrackImpl(new FileDataSourceImpl(h264File.getAbsolutePath()));
-                Movie m = new Movie();
-                m.addTrack(h264Track);
-
-                Container out = new DefaultMp4Builder().build(m);
-
-                FileOutputStream fos = new FileOutputStream(mp4File);
-                FileChannel fc = fos.getChannel();
-                out.writeContainer(fc);
-                fos.close();
-
-            } catch (IOException e) {
-                Log.e(TAG, e.toString());
-            }
         }
 
         private boolean deleteDir(File dir) {

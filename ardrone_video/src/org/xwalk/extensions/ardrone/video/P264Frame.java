@@ -21,6 +21,8 @@ public class P264Frame {
     private byte[] mPayload;
     private int mPayloadLength;
     private byte mFrameType;
+    private int mDisplayWidth;
+    private int mDisplayHeight;
 
     private enum P264FrameType {
         UNKNOWN,
@@ -50,11 +52,16 @@ public class P264Frame {
         mPayload = null;
         mPayloadLength = 0;
         mFrameType = P264FrameType.UNKNOWN.getValue();
+        mDisplayWidth = 0;
+        mDisplayHeight = 0;
     }
 
     public boolean isStartFrame() {
         return mFrameType == P264FrameType.IDR_FRAME.getValue();
     }
+
+    public int getDisplayWidth() { return mDisplayWidth; }
+    public int getDisplayHeight() { return mDisplayHeight; }
 
     public byte[] getPayload() { return mPayload; }
 
@@ -84,16 +91,23 @@ public class P264Frame {
         mPayloadLength = unsignedIntBytes2Int(bytes);
         Log.i(TAG, "Payload size: " + mPayloadLength);
 
-        // Skip 18 bytes:
         // encoded_stream_width 2
         // encoded_stream_height 2
+        inputStream.skip(4);
+
         // display_width 2
         // display_height 2
+        bytes = readDesiredBytes(inputStream, 2);
+        mDisplayWidth = unsignedIntBytes2Int(bytes);
+        bytes = readDesiredBytes(inputStream, 2);
+        mDisplayHeight = unsignedIntBytes2Int(bytes);
+        Log.i(TAG, "Display Width/Height: " + mDisplayWidth + "/" + mDisplayHeight);
+
         // frame_number 4
         // timestamp 4
         // total_chunks 1
         // chunk_index 1
-        inputStream.skip(18);
+        inputStream.skip(10);
 
         // frame type
         mFrameType = (byte)inputStream.read();
